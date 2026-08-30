@@ -1,0 +1,14 @@
+# build output
+nexon_code
+*.o
+
+# session artifacts
+.mpt_backups/
+
+# backups and scaffolding from development
+*.bak
+*.bak-*
+strawhat*
+
+# editor/OS
+.DS_Store
