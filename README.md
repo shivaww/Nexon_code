@@ -38,6 +38,12 @@ curl -fsSL https://raw.githubusercontent.com/shivaww/Nexon_code/main/nexon_code.
 clang++ -std=c++17 -O2 -o nexon_code nexon_code.cpp   # or g++
 ```
 
+Or skip the terminal entirely for downloading: hit the green **Code** button on the [repo page](https://github.com/shivaww/Nexon_code) → **Download ZIP**. Unzip it and you have everything — `nexon_code.cpp`, `prompt.md`, this README, the installer. This is also the easiest way to get `prompt.md` as a clean file: it comes down inside the zip, ready to attach to your chat without any copy-paste.
+
+```bash
+cd Nexon_code-main && clang++ -std=c++17 -O2 -o nexon_code nexon_code.cpp   # build from the zip
+```
+
 ## Quickstart
 
 **Step 1 — give your chat the prompt.** Download [`prompt.md`](https://raw.githubusercontent.com/shivaww/Nexon_code/main/prompt.md) and attach it to your AI chat as a file (system prompt / custom instructions / attachment — wherever your chat accepts it). **Download it as a file; do not copy-paste the text** — 300 lines pasted through a terminal clipboard can arrive mangled with broken line endings, and a slightly corrupted prompt makes the model emit malformed commands that waste your round-trips. A direct file download gives your chat exactly what we wrote. On Termux: `curl -fsSL https://raw.githubusercontent.com/shivaww/Nexon_code/main/prompt.md -o prompt.md` downloads it intact.
