@@ -23,20 +23,30 @@ Every agent framework today assumes you can pay: an API key, a subscription, tok
 - **One file, one dependency** — a single ~4,000-line C++17 source; `clang++`/`g++` and you're done
 - **Built for phones** — large-paste handling, raw-mode input, echo suppression, and `--plain` output for chat apps that mangle ANSI
 
-## Build
+## Install
+
+One copy-paste. On Termux it installs a C++ compiler if needed, downloads the source, compiles, and puts `nexon_code` on your PATH:
 
 ```bash
-clang++ -std=c++17 -O2 -o nexon_code nexon_code.cpp
-# or: g++ -std=c++17 -O2 -o nexon_code nexon_code.cpp
+curl -fsSL https://raw.githubusercontent.com/shivaww/Nexon_code/main/install.sh | bash
 ```
 
-No cmake, no vcpkg, no dependencies. Linux, macOS, Termux.
+Prefer building manually? No cmake, no vcpkg, no dependencies — one file:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/shivaww/Nexon_code/main/nexon_code.cpp -o nexon_code.cpp
+clang++ -std=c++17 -O2 -o nexon_code nexon_code.cpp   # or g++
+```
 
 ## Quickstart
 
+**Step 1 — give your chat the prompt.** Download [`prompt.md`](https://raw.githubusercontent.com/shivaww/Nexon_code/main/prompt.md) and attach it to your AI chat as a file (system prompt / custom instructions / attachment — wherever your chat accepts it). **Download it as a file; do not copy-paste the text** — 300 lines pasted through a terminal clipboard can arrive mangled with broken line endings, and a slightly corrupted prompt makes the model emit malformed commands that waste your round-trips. A direct file download gives your chat exactly what we wrote. On Termux: `curl -fsSL https://raw.githubusercontent.com/shivaww/Nexon_code/main/prompt.md -o prompt.md` downloads it intact.
+
+**Step 2 — launch on your project.**
+
 ```bash
-./nexon_code /path/to/project        # interactive
-./nexon_code /path/to/project < req.json   # piped (recommended for big payloads)
+nexon_code /path/to/project        # interactive (up to 3 project folders)
+nexon_code /path/to/project < req.json   # piped (recommended for big payloads)
 ```
 
 Paste a JSON command into the session; it executes the moment its braces balance:
@@ -58,7 +68,7 @@ Paste a JSON command into the session; it executes the moment its braces balance
 
 The result comes back as JSON you copy to your model. Slash commands inside a session: `/help` `/clear` `/roots` `/plain` `/exit`; `Ctrl+L` redraws the header.
 
-> **The other half of the system is the prompt.** Ship `prompt.md` from this repo alongside the binary — it teaches the model the JSON dialect, verification discipline, and (optionally) multi-agent orchestration. Attach it as the model's system prompt.
+> **The prompt is the other half of the system** — it teaches the model the JSON dialect, verification discipline, and multi-agent orchestration. If you used the installer, it's already on your device at `~/.nexon_code/prompt.md`, downloaded as a file. Attach it to your chat as described in Quickstart.
 
 ## Usage
 
