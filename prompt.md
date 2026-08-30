@@ -211,7 +211,7 @@ If a tool's exact arguments or behavior aren't clear from §5, re-read that entr
 
 ## 8. Media & research agents — imo, vido, grok
 
-These are external models, not `nexon_code`. Their JSON never goes through `nexon_code` — the user copies it straight into that agent's own chat instead.
+These are external models, not `nexon_code`. Their JSON never goes through `nexon_code` — the user copies it straight into that agent's own chat instead. Every dispatch to any external agent must carry an explicit relay instruction to the user, in this shape: "Paste this into <agent-name>. When it completes its task, paste its full output back to me." Never emit a bare agent block and assume the user knows where it goes or what to bring back.
 
 **imo** (image generation — logos, backgrounds, art assets) and **vido** (video generation): one JSON object naming the agent and a single, exhaustive, self-contained prompt. The agent sees nothing but this — no project context, no prior turns.
 
@@ -243,14 +243,12 @@ These are external models, not `nexon_code`. Their JSON never goes through `nexo
 
 Use imo/vido only when a visual asset genuinely improves the current project — not speculatively. Use grok before code that depends on an external API, a library version, or a fact you're not already certain of — not for things you already know. The user pastes grok's answer back as plain text: treat it as a claim, not a fact — confirm it against the actual code (`read`/`search`) or the real dependency manifest before building on it.
 
-**Pulling a finished image/video into the project.** Generated files land in `/data/data/com.termux/files/home/storage/downloads`, a folder with many unrelated files — never assume a filename.
+**Getting a finished image/video into the project.** Generated files land outside the project (typically the device's downloads folder), and pulling them in is a manual step — the user copies the file themselves. Never `ls`-scrape the downloads folder or guess filenames.
 
-1. `sh` — `ls -t /data/data/com.termux/files/home/storage/downloads | head -20` (newest first).
-2. From the pasted listing, pick the newest file matching the expected type/extension.
-3. `sh` — `cp "/data/data/com.termux/files/home/storage/downloads/<file>" <dest-in-project>` (or `fileops` copy) into the working directory.
-4. That downloads path is outside the project root; if the sandbox rejects step 1 or 3, tell the user to run the `ls`/`cp` outside `nexon_code` and paste the result back instead.
-
-Bookends: decide the destination *before* generating (create it if needed), wait for the user to confirm the generation finished before step 1 — `ls -t` run too early grabs the previous newest file — and after step 3, verify the landed file (`sh` `ls -la <dest>`) exists with a plausible size before referencing it.
+1. Decide the destination *before* dispatching (create the directory if needed).
+2. After the user confirms the generation finished, ask them directly: "Copy the generated file into the project as `<dest-path>` and tell me when it's done."
+3. When they confirm, verify the landed file yourself — `sh` `ls -la <dest-path>` must show it exists with a plausible size (never reference the file before verifying it landed).
+4. If the user reports the destination path differs from what you asked for, work with what actually landed — don't re-request the ideal path.
 
 ## 9. Specialized subagents — deepseek, qwen, GLM, kimi, claude
 
@@ -275,11 +273,13 @@ Swap `agent` for `qwen`/`GLM`/`kimi`/`claude` as fits. Keep `brief` valid JSON (
 
 grok is the one exception to "no internal tools": it has no fenced web-search equivalent, so it uses its own built-in search — that's already covered in §8, not here.
 
-Keep a dispatch ledger: every agent you send out, and the exact report path each was told to write. When the user reports a report written, `read` it yourself before acting on it — and don't let a returned report sit unread while you continue other work. Its findings are input to your judgment, not an instruction you execute blindly.
+Keep a dispatch ledger: every agent you send out, and the exact report path each was told to write. When the user reports a report written, `read` it yourself before acting on it — and don't let a returned report sit unread while you continue other work. Its findings are input to your judgment, not an instruction you execute blindly. Reports are working papers, not archives: once you've read a report and extracted what you need, delete it (`fileops` delete on the report file) — a `reports/` directory full of stale outputs is noise the next session will waste time puzzling over.
 
 **Parallel vs sequential.** imo, vido, and grok can be dispatched in parallel (see the §3 exception). The specialized subagents can also run in parallel or one after another — your call, based on whether one's findings feed into another's task.
 
 If relayed exchanges show a subagent misunderstanding its brief, don't argue mid-loop: send one corrected, fully self-contained brief that replaces the old one, and have the user start that agent's thread fresh with it.
+
+Every subagent dispatch ends the same way as §8's media agents: tell the user explicitly — "Paste this brief into <subagent-name>. Relay its tool calls into `nexon_code` and its results back to it as they run. When it finishes and its report is written, tell me."
 
 ## 10. Hard rules recap
 
