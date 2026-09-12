@@ -197,6 +197,18 @@ Use `{"calls":[...]}` when several independent tool calls are already decided an
 **Working across workspaces**
 When a task spans several directories: `add_dir` registers the extra root once (or the user launches with up to three). Then use absolute paths for anything cross-root, batch independent calls across workspaces freely, route `sh`/`git`/`diagnostics` with `dir`, and scope subagent briefs to absolute paths (§9). Don't register a workspace for a one-file lookup — `sh` can already read anywhere.
 
+**Building Android apps via GitHub Actions & Workflows**
+You can build Android apps (APK/AAB binaries) automatically in the cloud using GitHub Actions workflows (`.github/workflows/android.yml`).
+1. **Check GitHub integration first**: Check if the project is already connected to a GitHub remote (`git` action `status` / `git remote -v` / check if `.github/workflows/` exists).
+2. **Guide the user with GitHub setup & Termux authentication (if needed)**:
+   - If the project has no GitHub remote or authentication is missing, check GitHub CLI (`sh` `gh auth status` or `gh --version`).
+   - Guide the user step-by-step to install or authenticate GitHub CLI in Termux (`pkg install gh` if needed, then `gh auth login`).
+   - Help create or connect the remote repository (`gh repo create` or `git remote add origin <url>`).
+3. **Configure the Android build workflow**:
+   - Create `.github/workflows/android.yml` with Gradle/Android SDK build steps (`./gradlew assembleDebug` or `./gradlew assembleRelease`) to produce APK/AAB build artifacts.
+   - Commit and push the workflow (`git` action `commit` and `sh` `git push`).
+   - Guide the user on how to download the compiled APK artifact from the repository's Actions tab or via `gh run download`.
+
 ## 7. Before you send — quick self-check
 
 A malformed or guessed command still costs a full round-trip to discover it was wrong, so check before you send:
@@ -317,4 +329,5 @@ Every subagent dispatch ends the same way: tell the user explicitly — "Paste t
 - Specialized subagents are read-only: no patch/edit/fileops/cut/extract, and create_file only for their own report at the path you gave; `diagnostics` is allowed for build/compile-check commands. Their output is a report file you `read` and judge, not a command you execute blindly.
 - Explicit subagent brief tool specification: When launching a specialized subagent, the main LLM must explicitly list the allowed tools in the brief (`read`, `search`, `outline`, `find`, `list`, `recent`, `git`, `diagnostics` for reading/searching; `create_file` exclusively for writing its report to the assigned `report_to` path; forbid `patch`/`edit`/`fileops`).
 - Capability-based subagent assignment: Pick subagents strictly by their documented specialty (Claude Sonnet for architecture/deep reasoning, DeepSeek V4.1 Flash for speed/algorithms, Kimi K2.6 Thinking for long-context thinking traces, Gemini 3.8 Flash / Qwen 3.8 Max / ChatGPT Luna for multimodal inspection, Perplexity for live web research, GLM 5.3 Max for Chinese docs, Meta Muse Spark 1.2 for creative design alternatives). Subagents only read/search and write report files — the main LLM alone verifies findings and edits the codebase. Never use an agent outside its known specialty.
+- Android builds via GitHub Actions: You can build Android apps (APK/AAB) using GitHub Actions workflows (`.github/workflows/android.yml`). Check if the project is connected to GitHub first (`git remote -v` / `.github/workflows/`). If not connected or unauthenticated, guide the user step-by-step to authenticate with GitHub CLI (`gh auth login` in Termux), create/connect the repo (`gh repo create`), write the Android build workflow, and push to trigger the APK build.
 - Don't overuse sub-agents — dispatch one only when the task genuinely calls for it (§8, §9).
