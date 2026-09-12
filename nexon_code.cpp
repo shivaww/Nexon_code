@@ -2446,12 +2446,26 @@ void findFilesRecursive(const fs::path& dir, const fs::path& baseDir, const std:
 }
 Json toolFind(const Json& args, const fs::path& baseDir) {
     std::vector<std::string> globs;
+    auto addGlob = [&](std::string s) {
+        if (s.empty()) return;
+        if (s[0] == '.' && s.find('*') == std::string::npos && s.find('?') == std::string::npos) {
+            s = "*" + s;
+        }
+        globs.push_back(s);
+    };
+
     const std::vector<Json>* globArr = args.getArr2("g", "globs");
-    if (globArr) for (auto& g : *globArr) if (g.type == Json::Type::String) globs.push_back(g.str);
-    std::string singleGlob = args.getStr2("glob", "glob", "");
-    if (!singleGlob.empty()) globs.push_back(singleGlob);
+    if (!globArr) globArr = args.getArr2("glob", "globs");
+    if (globArr) {
+        for (auto& g : *globArr) {
+            if (g.type == Json::Type::String) addGlob(g.str);
+        }
+    }
+    std::string singleGlob = args.getStr2("g", "glob", "");
+    if (!singleGlob.empty()) addGlob(singleGlob);
+
     if (globs.empty()) {
-        Json r = Json::Obj(); r.set("err", Json::Str("'glob' (or 'g' array) is required")); return r;
+        Json r = Json::Obj(); r.set("err", Json::Str("'g' or 'glob' pattern is required")); return r;
     }
     const std::vector<Json>* paths = args.getArr2("paths", "paths");
     std::vector<std::string> subpaths;
@@ -2503,7 +2517,7 @@ std::vector<OutlineEntry> extractOutline(const std::vector<std::string>& lines, 
                   ext == ".h" || ext == ".hpp" || ext == ".hh" || ext == ".hxx");
     bool isGo = (ext == ".go");
     bool isRust = (ext == ".rs");
-    bool isJava = (ext == ".java" || ext == ".kt" || ext == ".scala");
+    bool isJava = (ext == ".java" || ext == ".kt" || ext == ".scala" || ext == ".cs");
     for (size_t i = 0; i < lines.size() && i < 50000; ++i) {
         std::string line = lines[i];
         std::string trimmed = trim(line);
@@ -2515,7 +2529,7 @@ std::vector<OutlineEntry> extractOutline(const std::vector<std::string>& lines, 
             continue;
         }
         if (isPython) {
-            if (trimmed.substr(0, 4) == "def " || trimmed.substr(0, 5) == "async") {
+            if (trimmed.substr(0, 4) == "def " || trimmed.substr(0, 10) == "async def " || trimmed.find(" def ") != std::string::npos) {
                 size_t defPos = trimmed.find("def ");
                 if (defPos != std::string::npos) {
                     size_t colonPos = trimmed.find(':');
@@ -2531,27 +2545,66 @@ std::vector<OutlineEntry> extractOutline(const std::vector<std::string>& lines, 
             }
         }
         if (isJs) {
-            if (trimmed.substr(0, 9) == "function " || trimmed.substr(0, 14) == "export async " ||
-                trimmed.substr(0, 15) == "export function" || trimmed.substr(0, 15) == "export default " ||
-                trimmed.find("function ") != std::string::npos) {
+            if (trimmed.find("function ") != std::string::npos || trimmed.find("function(") != std::string::npos) {
                 size_t bracePos = trimmed.find('{');
                 std::string sig = (bracePos != std::string::npos) ? trim(trimmed.substr(0, bracePos)) : trimmed;
                 if (!sig.empty()) entries.push_back({(long)(i+1), "func", sig});
                 continue;
             }
-            if (trimmed.substr(0, 6) == "class " || trimmed.substr(0, 13) == "export class ") {
+            if ((trimmed.substr(0, 6) == "const " || trimmed.substr(0, 4) == "let " || trimmed.substr(0, 4) == "var " ||
+                 trimmed.substr(0, 13) == "export const " || trimmed.substr(0, 11) == "export let ") &&
+                (trimmed.find("=>") != std::string::npos || trimmed.find("function") != std::string::npos)) {
+                size_t eqPos = trimmed.find('=');
+                std::string sig = (eqPos != std::string::npos) ? trim(trimmed.substr(0, eqPos)) : trimmed;
+                if (!sig.empty()) entries.push_back({(long)(i+1), "func", sig});
+                continue;
+            }
+            if (trimmed.find("class ") != std::string::npos || trimmed.find("interface ") != std::string::npos ||
+                trimmed.find("type ") != std::string::npos || trimmed.find("enum ") != std::string::npos) {
                 size_t bracePos = trimmed.find('{');
-                std::string sig = (bracePos != std::string::npos) ? trim(trimmed.substr(0, bracePos)) : trimmed;
-                entries.push_back({(long)(i+1), "class", sig}); continue;
+                size_t eqPos = trimmed.find('=');
+                size_t endPos = std::min(bracePos, eqPos);
+                std::string sig = (endPos != std::string::npos) ? trim(trimmed.substr(0, endPos)) : trimmed;
+                std::string typeTag = (trimmed.find("class") != std::string::npos) ? "class" : "type";
+                entries.push_back({(long)(i+1), typeTag, sig}); continue;
             }
         }
-        if (isCpp || isJava || isGo || isRust) {
+        if (isRust) {
+            if (trimmed.find("fn ") != std::string::npos) {
+                size_t bracePos = trimmed.find('{');
+                std::string sig = (bracePos != std::string::npos) ? trim(trimmed.substr(0, bracePos)) : trimmed;
+                entries.push_back({(long)(i+1), "func", sig}); continue;
+            }
+            if (trimmed.find("struct ") != std::string::npos || trimmed.find("enum ") != std::string::npos ||
+                trimmed.find("trait ") != std::string::npos || trimmed.find("impl ") != std::string::npos) {
+                size_t bracePos = trimmed.find('{');
+                std::string sig = (bracePos != std::string::npos) ? trim(trimmed.substr(0, bracePos)) : trimmed;
+                std::string typeTag = (trimmed.find("struct") != std::string::npos) ? "struct" :
+                                      (trimmed.find("trait") != std::string::npos) ? "trait" :
+                                      (trimmed.find("impl") != std::string::npos) ? "impl" : "enum";
+                entries.push_back({(long)(i+1), typeTag, sig}); continue;
+            }
+        }
+        if (isGo) {
+            if (trimmed.substr(0, 5) == "func ") {
+                size_t bracePos = trimmed.find('{');
+                std::string sig = (bracePos != std::string::npos) ? trim(trimmed.substr(0, bracePos)) : trimmed;
+                entries.push_back({(long)(i+1), "func", sig}); continue;
+            }
+            if (trimmed.substr(0, 5) == "type " && (trimmed.find("struct") != std::string::npos || trimmed.find("interface") != std::string::npos)) {
+                size_t bracePos = trimmed.find('{');
+                std::string sig = (bracePos != std::string::npos) ? trim(trimmed.substr(0, bracePos)) : trimmed;
+                std::string typeTag = (trimmed.find("struct") != std::string::npos) ? "struct" : "interface";
+                entries.push_back({(long)(i+1), typeTag, sig}); continue;
+            }
+        }
+        if (isCpp || isJava || !isPython) {
             if (trimmed.find("struct ") != std::string::npos && trimmed.find("struct ") < 20) {
                 size_t bracePos = trimmed.find('{');
                 size_t parenPos = trimmed.find('(');
                 size_t endPos = std::min(bracePos, parenPos);
                 std::string sig = (endPos != std::string::npos) ? trim(trimmed.substr(0, endPos)) : trimmed;
-                if (sig.size() > 7) entries.push_back({(long)(i+1), "struct", sig});
+                if (sig.size() > 5) entries.push_back({(long)(i+1), "struct", sig});
                 continue;
             }
             if (trimmed.find("class ") != std::string::npos && trimmed.find("class ") < 20) {
@@ -2559,26 +2612,30 @@ std::vector<OutlineEntry> extractOutline(const std::vector<std::string>& lines, 
                 size_t colonPos = trimmed.find(':');
                 size_t endPos = std::min(bracePos, colonPos);
                 std::string sig = (endPos != std::string::npos) ? trim(trimmed.substr(0, endPos)) : trimmed;
-                if (sig.size() > 6) entries.push_back({(long)(i+1), "class", sig});
+                if (sig.size() > 5) entries.push_back({(long)(i+1), "class", sig});
                 continue;
             }
             bool hasParen = trimmed.find('(') != std::string::npos && trimmed.find(')') != std::string::npos;
-            if (hasParen && trimmed.back() == '{') {
-                std::string sig = trim(trimmed.substr(0, trimmed.size() - 1));
+            bool endsWithBrace = (trimmed.back() == '{');
+            if (!endsWithBrace && trimmed.find('{') != std::string::npos) {
+                std::string tail = trim(trimmed.substr(trimmed.find('{')));
+                if (tail == "{") endsWithBrace = true;
+            }
+            if (hasParen && endsWithBrace) {
+                size_t bracePos = trimmed.find('{');
+                std::string sig = trim(trimmed.substr(0, bracePos));
                 if (sig.substr(0, 3) == "if " || sig.substr(0, 4) == "for " || sig.substr(0, 6) == "while " ||
-                    sig.substr(0, 6) == "switch" || sig.substr(0, 4) == "else" || sig.substr(0, 5) == "catch") continue;
+                    sig.substr(0, 6) == "switch" || sig.substr(0, 4) == "else" || sig.substr(0, 5) == "catch" ||
+                    sig.substr(0, 5) == "guard") continue;
                 size_t parenPos = sig.find('(');
                 if (parenPos > 0) entries.push_back({(long)(i+1), "func", sig});
                 continue;
             }
             if (hasParen && trimmed.back() == ')') {
-                if (i + 1 < lines.size() && trim(lines[i+1]) == "{") {
+                if (i + 1 < lines.size() && (trim(lines[i+1]) == "{" || trim(lines[i+1]).substr(0, 1) == "{")) {
                     if (trimmed.substr(0, 3) == "if " || trimmed.substr(0, 4) == "for " ||
                         trimmed.substr(0, 6) == "while " || trimmed.substr(0, 6) == "switch" ||
                         trimmed.substr(0, 4) == "else" || trimmed.substr(0, 5) == "catch") continue;
-                    if (isGo && trimmed.substr(0, 5) == "func ") {
-                        entries.push_back({(long)(i+1), "func", trimmed}); continue;
-                    }
                     size_t parenPos = trimmed.find('(');
                     if (parenPos > 0) entries.push_back({(long)(i+1), "func", trimmed});
                 }
@@ -2588,28 +2645,69 @@ std::vector<OutlineEntry> extractOutline(const std::vector<std::string>& lines, 
     return entries;
 }
 Json toolOutline(const Json& args, const fs::path& baseDir) {
-    std::string relFile = args.getStr2("f", "file");
-    if (relFile.empty()) {
-        Json r = Json::Obj(); r.set("err", Json::Str("'f' (file) is required")); return r;
+    std::vector<std::string> fileList;
+    const std::vector<Json>* filesArr = args.getArr2("f", "files");
+    if (!filesArr) filesArr = args.getArr2("files", "paths");
+    if (!filesArr) filesArr = args.getArr2("p", "paths");
+    if (filesArr) {
+        for (auto& item : *filesArr) if (item.type == Json::Type::String) fileList.push_back(item.str);
     }
-    fs::path full;
-    if (!safeResolve(baseDir, relFile, full)) {
-        Json r = Json::Obj(); r.set("err", Json::Str("path escapes project sandbox: " + relFile)); return r;
+    std::string singleFile = args.getStr2("f", "file", "");
+    if (singleFile.empty()) singleFile = args.getStr2("p", "path", "");
+    if (!singleFile.empty()) fileList.push_back(singleFile);
+
+    if (fileList.empty()) {
+        Json r = Json::Obj(); r.set("err", Json::Str("'f' (file or files array) is required")); return r;
     }
-    std::error_code ec;
-    if (!fs::exists(full, ec)) {
-        Json r = Json::Obj(); r.set("err", Json::Str("not found: " + relFile)); return r;
+
+    if (fileList.size() == 1) {
+        std::string relFile = fileList[0];
+        fs::path full;
+        if (!safeResolve(baseDir, relFile, full)) {
+            Json r = Json::Obj(); r.set("err", Json::Str("path escapes project sandbox: " + relFile)); return r;
+        }
+        std::error_code ec;
+        if (!fs::exists(full, ec)) {
+            Json r = Json::Obj(); r.set("err", Json::Str("not found: " + relFile)); return r;
+        }
+        std::vector<std::string> lines = readFileLines(full.string());
+        std::string ext = toLower(full.extension().string());
+        auto entries = extractOutline(lines, ext);
+        std::ostringstream out;
+        for (auto& e : entries) out << e.line << ":" << e.type << ": " << e.signature << "\n";
+        Json r = Json::Obj();
+        r.set("f", Json::Str(relFile));
+        r.set("n", Json::Num((double)entries.size()));
+        r.set("o", Json::Str(out.str()));
+        return r;
+    } else {
+        Json outArr = Json::Arr();
+        for (auto& relFile : fileList) {
+            fs::path full;
+            Json item = Json::Obj();
+            item.set("f", Json::Str(relFile));
+            if (!safeResolve(baseDir, relFile, full)) {
+                item.set("err", Json::Str("path escapes project sandbox"));
+            } else {
+                std::error_code ec;
+                if (!fs::exists(full, ec)) {
+                    item.set("err", Json::Str("not found"));
+                } else {
+                    std::vector<std::string> lines = readFileLines(full.string());
+                    std::string ext = toLower(full.extension().string());
+                    auto entries = extractOutline(lines, ext);
+                    std::ostringstream out;
+                    for (auto& e : entries) out << e.line << ":" << e.type << ": " << e.signature << "\n";
+                    item.set("n", Json::Num((double)entries.size()));
+                    item.set("o", Json::Str(out.str()));
+                }
+            }
+            outArr.arr.push_back(item);
+        }
+        Json r = Json::Obj();
+        r.set("outlines", outArr);
+        return r;
     }
-    std::vector<std::string> lines = readFileLines(full.string());
-    std::string ext = toLower(full.extension().string());
-    auto entries = extractOutline(lines, ext);
-    std::ostringstream out;
-    for (auto& e : entries) out << e.line << ":" << e.type << ": " << e.signature << "\n";
-    Json r = Json::Obj();
-    r.set("f", Json::Str(relFile));
-    r.set("n", Json::Num((double)entries.size()));
-    r.set("o", Json::Str(out.str()));
-    return r;
 }
 Json toolRecent(const Json& args, const fs::path& baseDir) {
     long minutes = args.getInt2("min", "minutes", 30);
