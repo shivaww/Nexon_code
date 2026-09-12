@@ -72,7 +72,7 @@ Paste a JSON command into the session; it executes the moment its braces balance
 }
 ```
 
-The result comes back as JSON you copy to your model. Slash commands inside a session: `/help` `/clear` `/roots` `/plain` `/exit`; `Ctrl+L` redraws the header.
+The result comes back as JSON you copy to your model. Slash commands inside a session: `/help` `/clear` `/roots` `/plain` `/stop` `/exit`; `Ctrl+L` redraws the header.
 
 > **The prompt is the other half of the system** — it teaches the model the JSON dialect, verification discipline, and multi-agent orchestration. If you used the installer, it's already on your device at `~/.nexon_code/prompt.md`, downloaded as a file. Attach it to your chat as described in Quickstart.
 

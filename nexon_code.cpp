@@ -3978,94 +3978,188 @@ int main(int argc, char* argv[]) {
     if (isTty && termiosChanged) {
         char buf[4096];
         std::string pendingInput;
+        std::string currentLine;
         static constexpr size_t ECHO_LIMIT = 64 * 1024; // stop full-echo past 64KB
         bool echoLarge = false;
         size_t nextProgressAt = 0;
 
         while (true) {
-            ssize_t n = read(STDIN_FILENO, buf, sizeof(buf));
-            if (n < 0) {
-                if (errno == EINTR) continue;
-                break;
-            }
-            if (n == 0) break;
+                    ssize_t n = read(STDIN_FILENO, buf, sizeof(buf));
+                    if (n < 0) {
+                        if (errno == EINTR) continue;
+                        break;
+                    }
+                    if (n == 0) break;
 
-            for (ssize_t k = 0; k < n; ++k) {
-                char c = buf[k];
-                if (!collecting) {
-                    if (c == '\n' || c == '\r') {
-                        std::string line = pendingInput;
-                        pendingInput.clear();
-                        std::string trimmed = trim(line);
-                        if (trimmed.empty()) continue;
-                        std::string lower = toLower(trimmed);
-                        if (lower == "exit" || lower == "quit" || lower == "/exit" || lower == "/quit") goto done;
-                        if (lower == "help" || lower == "/help") { printHelp(); tuiPrompt(); continue; }
-                        if (lower == "/clear") { printTuiBanner(); tuiPrompt(); continue; }
-                        if (lower == "/roots") {
-                            for (size_t i = 0; i < g_roots.size(); ++i)
-                                std::cout << GRN << (i == 0 ? "  primary: " : "  extra:   ") << g_roots[i].string() << RST << "\n";
-                            tuiPrompt();
-                            continue;
-                        }
-                        if (lower == "/plain") {
-                            g_plainMode = !g_plainMode;
-                            g_colorOut = isatty(STDOUT_FILENO) && !g_plainMode;
-                            std::cout << YEL << "[nexon] plain mode " << (g_plainMode ? "on" : "off") << RST << "\n";
-                            tuiPrompt();
-                            continue;
-                        }
-                        if (!trimmed.empty() && trimmed[0] == '/') {
-                            std::cout << YEL << "[nexon] Unknown slash command. Try /help /clear /roots /plain /exit" << RST << "\n";
-                            tuiPrompt();
-                            continue;
-                        }
-                        size_t bracePos = line.find('{');
-                        size_t bracketPos = line.find('[');
-                        if (bracePos == std::string::npos && bracketPos == std::string::npos) {
-                            std::cout << YEL << "[nexon] Not JSON. Type 'help' or 'exit'." << RST << "\n";
-                            tuiPrompt();
-                            continue;
-                        }
-                        collecting = true;
-                        acc.reset();
-                        echoLarge = false;
-                        nextProgressAt = 0;
-                        std::cout << "\n" << BG_CYAN << BOLD << " ▲ INPUT " << RST << " " << CYN << "(pasting JSON...)" << RST << "\n";
-                        std::cout << CYN << "┌────────────────────────────────────────────────────" << RST << "\n";
-                        std::cout << CYN << "│" << RST;
-                        size_t bp = std::min(bracePos, bracketPos); // whichever opener appears first
-                        // pendingInput (and thus this first line) can itself already be
-                        // the entire huge payload if the JSON was pasted as one line with
-                        // no interior newlines (typical when "c" holds \n-escaped source).
-                        // Apply the same echo-suppression here, not just in the byte loop.
-                        for (size_t i = bp; i < line.size(); ++i) {
-                            acc.feed(line[i]);
-                            if (acc.buffer.size() <= ECHO_LIMIT) {
-                                std::cout << line[i];
-                            } else {
-                                if (!echoLarge) {
-                                    echoLarge = true;
-                                    nextProgressAt = acc.buffer.size();
-                                    std::cout << "\n" << CYN << "  (large paste: showing progress instead of full echo)" << RST << "\n";
+                    for (ssize_t k = 0; k < n; ++k) {
+                        char c = buf[k];
+                        if (!collecting) {
+                            if (c == '\n' || c == '\r') {
+                                std::string line = pendingInput;
+                                pendingInput.clear();
+                                std::string trimmed = trim(line);
+                                if (trimmed.empty()) continue;
+                                std::string lower = toLower(trimmed);
+                                if (lower == "exit" || lower == "quit" || lower == "/exit" || lower == "/quit") goto done;
+                                if (lower == "help" || lower == "/help") { printHelp(); tuiPrompt(); continue; }
+                                if (lower == "/clear") { printTuiBanner(); tuiPrompt(); continue; }
+                                if (lower == "/roots") {
+                                    for (size_t i = 0; i < g_roots.size(); ++i)
+                                        std::cout << GRN << (i == 0 ? "  primary: " : "  extra:   ") << g_roots[i].string() << RST << "\n";
+                                    tuiPrompt();
+                                    continue;
                                 }
-                                if (acc.buffer.size() >= nextProgressAt) {
-                                    std::cout << "\r" << CYN << "  received " << humanSize(acc.buffer.size())
-                                               << " / cap " << humanSize(acc.MAX_BUFFER) << "   " << RST;
+                                if (lower == "/plain") {
+                                    g_plainMode = !g_plainMode;
+                                    g_colorOut = isatty(STDOUT_FILENO) && !g_plainMode;
+                                    std::cout << YEL << "[nexon] plain mode " << (g_plainMode ? "on" : "off") << RST << "\n";
+                                    tuiPrompt();
+                                    continue;
+                                }
+                                if (lower == "/stop" || lower == "stop" || lower == "/cancel" || lower == "/reset") {
+                                    std::cout << YEL << "[nexon] Session ready. Input buffer clean." << RST << "\n";
+                                    tuiPrompt();
+                                    continue;
+                                }
+                                if (!trimmed.empty() && trimmed[0] == '/') {
+                                    std::cout << YEL << "[nexon] Unknown slash command. Try /help /clear /roots /plain /stop /exit" << RST << "\n";
+                                    tuiPrompt();
+                                    continue;
+                                }
+                                size_t bracePos = line.find('{');
+                                size_t bracketPos = line.find('[');
+                                if (bracePos == std::string::npos && bracketPos == std::string::npos) {
+                                    std::cout << YEL << "[nexon] Not JSON. Type 'help' or 'exit'." << RST << "\n";
+                                    tuiPrompt();
+                                    continue;
+                                }
+                                collecting = true;
+                                acc.reset();
+                                echoLarge = false;
+                                nextProgressAt = 0;
+                                currentLine.clear();
+                                std::cout << "\n" << BG_CYAN << BOLD << " ▲ INPUT " << RST << " " << CYN << "(pasting JSON...)" << RST << "\n";
+                                std::cout << CYN << "┌────────────────────────────────────────────────────" << RST << "\n";
+                                std::cout << CYN << "│" << RST;
+                                size_t bp = std::min(bracePos, bracketPos); // whichever opener appears first
+                                for (size_t i = bp; i < line.size(); ++i) {
+                                    acc.feed(line[i]);
+                                    if (acc.buffer.size() <= ECHO_LIMIT) {
+                                        std::cout << line[i];
+                                    } else {
+                                        if (!echoLarge) {
+                                            echoLarge = true;
+                                            nextProgressAt = acc.buffer.size();
+                                            std::cout << "\n" << CYN << "  (large paste: showing progress instead of full echo)" << RST << "\n";
+                                        }
+                                        if (acc.buffer.size() >= nextProgressAt) {
+                                            std::cout << "\r" << CYN << "  received " << humanSize(acc.buffer.size())
+                                                       << " / cap " << humanSize(acc.MAX_BUFFER) << "   " << RST;
+                                            std::cout.flush();
+                                            nextProgressAt = acc.buffer.size() + 256 * 1024;
+                                        }
+                                    }
+                                    if (acc.overflow) break;
+                                }
+                                if (acc.overflow) {
+                                    std::cout << "\n" << CYN << "└────────────────────────────────────────────────────" << RST << "\n";
+                                    printError("Input buffer exceeded " + humanSize(acc.MAX_BUFFER) + " without completing",
+                                              "Raise it with --max-input=MB or TOOLS_MAX_INPUT=MB, or pipe from a file:\n  ./nexon_code " +
+                                              baseDir.string() + " < request.json");
+                                    collecting = false;
+                                    acc.reset();
+                                    echoLarge = false;
+                                    currentLine.clear();
+                                    tuiPrompt();
+                                    continue;
+                                }
+                                if (acc.complete) {
+                                    std::cout << "\n" << CYN << "└────────────────────────────────────────────────────" << RST << "\n";
                                     std::cout.flush();
-                                    nextProgressAt = acc.buffer.size() + 256 * 1024;
+                                    handleCommand(acc.buffer, baseDir);
+                                    collecting = false;
+                                    acc.reset();
+                                    currentLine.clear();
+                                    std::cout << "\n";
+                                    tuiPrompt();
                                 }
+                                continue;
                             }
-                            if (acc.overflow) break;
+                            if (c == 12) { // Ctrl+L: redraw header + prompt
+                                printTuiBanner();
+                                tuiPrompt();
+                                if (!pendingInput.empty()) { std::cout << pendingInput; std::cout.flush(); }
+                                continue;
+                            }
+                            if (c == 127 || c == 8) { // TUI line editing: backspace
+                                if (!pendingInput.empty()) {
+                                    pendingInput.pop_back();
+                                    std::cout << "\b \b";
+                                    std::cout.flush();
+                                }
+                                continue;
+                            }
+                            if ((unsigned char)c >= 32) { std::cout << c; std::cout.flush(); }
+                            pendingInput += c;
+                            if (pendingInput.size() > g_maxInputBytes) {
+                                printError("Input line exceeded " + humanSize(g_maxInputBytes) + " without a newline",
+                                          "Raise the cap with --max-input=MB or TOOLS_MAX_INPUT=MB, or pipe from a file:\n  ./nexon_code " +
+                                          baseDir.string() + " < request.json");
+                                pendingInput.clear();
+                            }
+                            continue;
                         }
+                        if (!acc.started && (c == '\n' || c == '\r' || c == ' ' || c == '\t')) {
+                            continue;
+                        }
+
+                        if (c == '\n' || c == '\r') {
+                            std::string lineTrimmed = trim(currentLine);
+                            std::string lineLower = toLower(lineTrimmed);
+                            currentLine.clear();
+                            if (lineLower == "/stop" || lineLower == "stop" || lineLower == "/cancel" || lineLower == "/reset") {
+                                std::cout << "\n" << CYN << "└────────────────────────────────────────────────────" << RST << "\n";
+                                std::cout << YEL << "[nexon] Input stopped/cancelled. Cleared incomplete JSON payload." << RST << "\n";
+                                collecting = false;
+                                acc.reset();
+                                echoLarge = false;
+                                pendingInput.clear();
+                                tuiPrompt();
+                                continue;
+                            }
+                        } else {
+                            currentLine += c;
+                        }
+
+                        acc.feed(c);
+                        if (acc.buffer.size() <= ECHO_LIMIT) {
+                            if (c == '\n') std::cout << "\n" << CYN << "│" << RST;
+                            else if ((unsigned char)c >= 32 || c == '\t') std::cout << c;
+                        } else {
+                            if (!echoLarge) {
+                                echoLarge = true;
+                                nextProgressAt = acc.buffer.size();
+                                std::cout << "\n" << CYN << "  (large paste: showing progress instead of full echo)" << RST << "\n";
+                            }
+                            if (acc.buffer.size() >= nextProgressAt) {
+                                std::cout << "\r" << CYN << "  received " << humanSize(acc.buffer.size())
+                                           << " / cap " << humanSize(acc.MAX_BUFFER) << "   " << RST;
+                                std::cout.flush();
+                                nextProgressAt = acc.buffer.size() + 256 * 1024;
+                            }
+                        }
+
                         if (acc.overflow) {
                             std::cout << "\n" << CYN << "└────────────────────────────────────────────────────" << RST << "\n";
                             printError("Input buffer exceeded " + humanSize(acc.MAX_BUFFER) + " without completing",
-                                      "Raise it with --max-input=MB or TOOLS_MAX_INPUT=MB, or pipe from a file:\n  ./nexon_code " +
+                                      "The input was likely truncated (tty canonical-mode limit, dropped paste, or memory), "
+                                      "or the payload is genuinely bigger than the cap. Raise it with --max-input=MB or "
+                                      "TOOLS_MAX_INPUT=MB, or write the JSON to a file and pipe it in:\n  ./nexon_code " +
                                       baseDir.string() + " < request.json");
                             collecting = false;
                             acc.reset();
                             echoLarge = false;
+                            currentLine.clear();
                             tuiPrompt();
                             continue;
                         }
@@ -4075,149 +4169,91 @@ int main(int argc, char* argv[]) {
                             handleCommand(acc.buffer, baseDir);
                             collecting = false;
                             acc.reset();
+                            currentLine.clear();
                             std::cout << "\n";
                             tuiPrompt();
                         }
-                        continue;
                     }
-                    if (c == 12) { // Ctrl+L: redraw header + prompt
-                        printTuiBanner();
-                        tuiPrompt();
-                        if (!pendingInput.empty()) { std::cout << pendingInput; std::cout.flush(); }
-                        continue;
-                    }
-                    if (c == 127 || c == 8) { // TUI line editing: backspace
-                        if (!pendingInput.empty()) {
-                            pendingInput.pop_back();
-                            std::cout << "\b \b";
-                            std::cout.flush();
+                }
+                done:;
+                if (collecting && acc.started) {
+                    std::cout << "\n" << CYN << "└────────────────────────────────────────────────────" << RST << "\n";
+                    printError("Input ended (EOF) before JSON braces balanced",
+                              "Received " + std::to_string(acc.buffer.size()) +
+                              " byte(s) that never formed valid JSON (unbalanced { }). Nothing was executed.");
+                }
+            } else {
+                std::string line;
+                std::string pendingInput;
+                while (std::getline(std::cin, line)) {
+                    std::string trimmed = trim(line);
+                    std::string lower = toLower(trimmed);
+                    if (lower == "/stop" || lower == "stop" || lower == "/cancel" || lower == "/reset") {
+                        if (collecting) {
+                            if (isTty) std::cout << CYN << "└────────────────────────────────────────────────────" << RST << "\n";
+                            std::cout << YEL << "[nexon] Input stopped/cancelled. Cleared incomplete JSON payload." << RST << "\n";
+                            collecting = false;
+                            acc.reset();
+                            if (isTty) tuiPrompt();
+                            continue;
+                        } else {
+                            if (isTty) {
+                                std::cout << YEL << "[nexon] Session ready. Input buffer clean." << RST << "\n";
+                                tuiPrompt();
+                            }
+                            continue;
                         }
+                    }
+                    if (!collecting) {
+                        if (trimmed.empty()) continue;
+                        if (lower == "exit" || lower == "quit") break;
+                        if (lower == "help") { printHelp(); continue; }
+                        if (line.find('{') == std::string::npos && line.find('[') == std::string::npos) {
+                            if (!isTty) {
+                                std::cerr << YEL << "[nexon] Non-JSON line ignored: " << trimmed.substr(0, 80) << RST << "\n";
+                            } else {
+                                std::cout << YEL << "[nexon] Not JSON. Type 'help' or 'exit'." << RST << "\n";
+                            }
+                            continue;
+                        }
+                        collecting = true;
+                        acc.reset();
+                        if (isTty) {
+                            std::cout << "\n" << BG_CYAN << BOLD << " ▲ INPUT " << RST << " " << CYN << "(pasting JSON...)" << RST << "\n";
+                            std::cout << CYN << "┌────────────────────────────────────────────────────" << RST << "\n";
+                            std::cout << CYN << "│" << RST << line << "\n";
+                        }
+                    } else if (isTty) {
+                        std::cout << CYN << "│" << RST << line << "\n";
+                    }
+                    for (char c : line) acc.feed(c);
+                    acc.feed('\n');
+
+                    if (acc.overflow) {
+                        if (isTty) std::cout << CYN << "└────────────────────────────────────────────────────" << RST << "\n";
+                        printError("Input buffer exceeded " + humanSize(acc.MAX_BUFFER) + " without completing",
+                                  "Raise it with --max-input=MB or TOOLS_MAX_INPUT=MB, or pipe via file: ./nexon_code " +
+                                  baseDir.string() + " < request.json");
+                        collecting = false;
+                        acc.reset();
                         continue;
                     }
-                    if ((unsigned char)c >= 32) { std::cout << c; std::cout.flush(); }
-                    pendingInput += c;
-                    if (pendingInput.size() > g_maxInputBytes) {
-                        // A single line with no terminator, already past cap: bail out
-                        // instead of growing pendingInput forever.
-                        printError("Input line exceeded " + humanSize(g_maxInputBytes) + " without a newline",
-                                  "Raise the cap with --max-input=MB or TOOLS_MAX_INPUT=MB, or pipe from a file:\n  ./nexon_code " +
-                                  baseDir.string() + " < request.json");
-                        pendingInput.clear();
-                    }
-                    continue;
-                }
-                if (!acc.started && (c == '\n' || c == '\r' || c == ' ' || c == '\t')) {
-                    continue;
-                }
-                acc.feed(c);
-                // Echoing every byte of a multi-MB paste back to the terminal with
-                // ANSI codes is what actually blows up Termux's memory/scrollback,
-                // not this process. Past ECHO_LIMIT, stop re-rendering the content
-                // and switch to a cheap in-place progress counter instead.
-                if (acc.buffer.size() <= ECHO_LIMIT) {
-                    if (c == '\n') std::cout << "\n" << CYN << "│" << RST;
-                    else if ((unsigned char)c >= 32 || c == '\t') std::cout << c;
-                } else {
-                    if (!echoLarge) {
-                        echoLarge = true;
-                        nextProgressAt = acc.buffer.size();
-                        std::cout << "\n" << CYN << "  (large paste: showing progress instead of full echo)" << RST << "\n";
-                    }
-                    if (acc.buffer.size() >= nextProgressAt) {
-                        std::cout << "\r" << CYN << "  received " << humanSize(acc.buffer.size())
-                                   << " / cap " << humanSize(acc.MAX_BUFFER) << "   " << RST;
+                    if (acc.complete) {
+                        if (isTty) std::cout << CYN << "└────────────────────────────────────────────────────" << RST << "\n";
                         std::cout.flush();
-                        nextProgressAt = acc.buffer.size() + 256 * 1024;
+                        handleCommand(acc.buffer, baseDir);
+                        collecting = false;
+                        acc.reset();
                     }
                 }
-
-                if (acc.overflow) {
-                    std::cout << "\n" << CYN << "└────────────────────────────────────────────────────" << RST << "\n";
-                    printError("Input buffer exceeded " + humanSize(acc.MAX_BUFFER) + " without completing",
-                              "The input was likely truncated (tty canonical-mode limit, dropped paste, or memory), "
-                              "or the payload is genuinely bigger than the cap. Raise it with --max-input=MB or "
-                              "TOOLS_MAX_INPUT=MB, or write the JSON to a file and pipe it in:\n  ./nexon_code " +
-                              baseDir.string() + " < request.json");
-                    collecting = false;
-                    acc.reset();
-                    echoLarge = false;
-                    tuiPrompt();
-                    continue;
-                }
-                if (acc.complete) {
-                    std::cout << "\n" << CYN << "└────────────────────────────────────────────────────" << RST << "\n";
-                    std::cout.flush();
-                    handleCommand(acc.buffer, baseDir);
-                    collecting = false;
-                    acc.reset();
-                    std::cout << "\n";
-                    tuiPrompt();
+                if (collecting && acc.started) {
+                    if (isTty) std::cout << CYN << "└────────────────────────────────────────────────────" << RST << "\n";
+                    printError("Input ended (EOF) before JSON braces balanced",
+                              "Received " + std::to_string(acc.buffer.size()) +
+                              " byte(s) that never formed valid JSON (unbalanced { }). "
+                              "Nothing was executed. Check the payload is complete and well-formed.");
                 }
             }
-        }
-        done:;
-        if (collecting && acc.started) {
-            std::cout << "\n" << CYN << "└────────────────────────────────────────────────────" << RST << "\n";
-            printError("Input ended (EOF) before JSON braces balanced",
-                      "Received " + std::to_string(acc.buffer.size()) +
-                      " byte(s) that never formed valid JSON (unbalanced { }). Nothing was executed.");
-        }
-    } else {
-        std::string line;
-        std::string pendingInput;
-        while (std::getline(std::cin, line)) {
-            if (!collecting) {
-                std::string trimmed = trim(line);
-                if (trimmed.empty()) continue;
-                std::string lower = toLower(trimmed);
-                if (lower == "exit" || lower == "quit") break;
-                if (lower == "help") { printHelp(); continue; }
-                if (line.find('{') == std::string::npos && line.find('[') == std::string::npos) {
-                    if (!isTty) {
-                        std::cerr << YEL << "[nexon] Non-JSON line ignored: " << trimmed.substr(0, 80) << RST << "\n";
-                    } else {
-                        std::cout << YEL << "[nexon] Not JSON. Type 'help' or 'exit'." << RST << "\n";
-                    }
-                    continue;
-                }
-                collecting = true;
-                acc.reset();
-                if (isTty) {
-                    std::cout << "\n" << BG_CYAN << BOLD << " ▲ INPUT " << RST << " " << CYN << "(pasting JSON...)" << RST << "\n";
-                    std::cout << CYN << "┌────────────────────────────────────────────────────" << RST << "\n";
-                    std::cout << CYN << "│" << RST << line << "\n";
-                }
-            } else if (isTty) {
-                std::cout << CYN << "│" << RST << line << "\n";
-            }
-            for (char c : line) acc.feed(c);
-            acc.feed('\n');
-
-            if (acc.overflow) {
-                if (isTty) std::cout << CYN << "└────────────────────────────────────────────────────" << RST << "\n";
-                printError("Input buffer exceeded " + humanSize(acc.MAX_BUFFER) + " without completing",
-                          "Raise it with --max-input=MB or TOOLS_MAX_INPUT=MB, or pipe via file: ./nexon_code " +
-                          baseDir.string() + " < request.json");
-                collecting = false;
-                acc.reset();
-                continue;
-            }
-            if (acc.complete) {
-                if (isTty) std::cout << CYN << "└────────────────────────────────────────────────────" << RST << "\n";
-                std::cout.flush();
-                handleCommand(acc.buffer, baseDir);
-                collecting = false;
-                acc.reset();
-            }
-        }
-        if (collecting && acc.started) {
-            if (isTty) std::cout << CYN << "└────────────────────────────────────────────────────" << RST << "\n";
-            printError("Input ended (EOF) before JSON braces balanced",
-                      "Received " + std::to_string(acc.buffer.size()) +
-                      " byte(s) that never formed valid JSON (unbalanced { }). "
-                      "Nothing was executed. Check the payload is complete and well-formed.");
-        }
-    }
 
     if (termiosChanged) {
         tcsetattr(STDIN_FILENO, TCSANOW, &origTermios);
