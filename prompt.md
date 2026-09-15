@@ -272,15 +272,15 @@ Read-only investigators, never coders. Subagents assist the main agent by analyz
 
 | Agent | Real Special Strengths | Task Assignment Scope |
 |---|---|---|
-| **Claude Sonnet (latest)** | Extremely strong careful reasoning, long-context code understanding, precise writing, architecture review, catching subtle logic & safety issues | Deep code review, architectural analysis, complex logic bugs, high-stakes reasoning, writing clean explanations |
-| **DeepSeek V4.1 Flash** | Very fast + strong coding & math, excellent on competitive programming style problems, efficient reasoning | Speed-critical code analysis, performance bottlenecks, algorithmic fixes, rapid iteration suggestions |
-| **Kimi K2.6 Thinking** | Exceptional long-context + extended chain-of-thought / "thinking" mode | Multi-step deep reasoning, very long files or large codebases, problems that need sustained thinking traces |
+| **Claude Sonnet (latest)** | Extremely strong careful reasoning, long-context code understanding, precise writing, architecture review, catching subtle logic & safety issues | Deep code review, architectural analysis, complex logic bugs, high-stakes reasoning, writing clean explanations but limited usage for long tasks |
+| **DeepSeek V4.1 Flash** | Very fast + strong coding & math, excellent on competitive programming style problems, efficient reasoning | Speed-critical code analysis, performance bottlenecks, algorithmic fixes, rapid iteration suggestions for fast deep analysis|
+| **Kimi K2.6 Thinking** | Exceptional long-context + extended chain-of-thought / "thinking" mode | Multi-step deep reasoning, very long files or large codebases, problems that need sustained thinking traces but very limited usage|
 | **Gemini 3.8 Flash (multimodal)** | Fast multimodal (image/video), strong real-time knowledge & search integration, good general coding | Multimodal inspection (screenshots, diagrams, UI), quick factual + code hybrid research |
-| **Qwen 3.8 Max (multimodal)** | Strong multimodal (image/video/audio), solid coding, excellent multilingual (especially Chinese + English sources) | Multimodal + code tasks, anything involving Chinese documentation or bilingual research |
+| **Qwen 3.8 Max (multimodal)** | Strong multimodal (image/video/audio), solid coding, excellent multilingual (especially Chinese + English sources) | Multimodal + code tasks, anything involving Chinese documentation or bilingual research and super strong at coding|
 | **ChatGPT Luna (multimodal)** | Mature vision + emerging video/audio understanding, strong generalist multimodal reasoning | Image/video/audio analysis, UI/UX visual bugs, media-related features |
 | **Perplexity** | Best-in-class web research + citation quality, live knowledge retrieval | Pure research tasks, documentation hunting, up-to-date library/API checks, sourcing evidence |
-| **GLM 5.3 Max** | Strong Chinese-language understanding + solid general coding/reasoning | Chinese ecosystem libraries, Chinese papers/docs, balanced bilingual analysis |
-| **Meta Muse Spark 1.2** | Creative generation, alternative design exploration, open-style ideation | "What if" design alternatives, creative refactors, non-obvious solution exploration |
+| **GLM 5.3 Max** | Strong Chinese-language understanding + solid general coding/reasoning | Chinese ecosystem libraries, Chinese papers/docs, balanced bilingual analysis overall strongest flagship available for coding with generous limits |
+| **Meta Muse Spark 1.2** | Creative generation, alternative design exploration, open-style ideation | "What if" design alternatives, creative refactors, non-obvious solution exploration and creative work|
 
 ### Selection & execution rules:
 1. **Match the bottleneck**: Look at the task, identify the exact bottleneck, and pick ONLY the agent(s) whose real specialty matches. Never use an agent outside its known specialty.
