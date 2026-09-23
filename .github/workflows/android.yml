@@ -27,8 +27,14 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      # NOTE: we deliberately do NOT use android-actions/setup-android@v3.
+      # As of 2026 it fails with `Failed to find package 'tools'` because the
+      # action still tries to install the removed legacy `tools` package.
+      # ubuntu-latest runners already ship the Android SDK pre-installed.
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses > /dev/null 2>&1 || true
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
 
       # No gradle wrapper in the repo (the .jar is binary; this project was
       # authored on-device). Use the runner's Gradle directly.
@@ -39,6 +45,9 @@ jobs:
 
       - name: Build debug APK
         run: gradle assembleDebug --no-daemon
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
