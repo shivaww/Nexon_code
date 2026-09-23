@@ -1,0 +1,111 @@
+{
+  "version": 1,
+  "_comment": "Selectors are best-effort for 2026; each provider's DOM shifts. Verify on your own logged-in accounts and patch here - no rebuild needed if loaded from assets.",
+  "defaults": {
+    "inputBackend": "dispatch",
+    "maxIterations": 20,
+    "streamQuietMs": 900
+  },
+  "sites": [
+    {
+      "name": "chatgpt",
+      "hosts": ["chatgpt.com", "chat.openai.com"],
+      "assistantSelector": "[data-message-author-role='assistant']",
+      "composerSelectors": [
+        "#prompt-textarea",
+        "div.ProseMirror[contenteditable='true']",
+        "textarea[data-id]",
+        "div[contenteditable='true']"
+      ],
+      "sendSelectors": [
+        "button[data-testid='send-button']",
+        "button[aria-label*='Send']",
+        "button[type='submit']"
+      ],
+      "stopSelectors": [
+        "button[data-testid='stop-button']",
+        "button[aria-label*='Stop']"
+      ],
+      "inputBackend": "dispatch"
+    },
+    {
+      "name": "claude",
+      "hosts": ["claude.ai"],
+      "assistantSelector": "div[data-testid='assistant-message'], div.font-claude-message",
+      "composerSelectors": [
+        "div.ProseMirror[contenteditable='true']",
+        "div[contenteditable='true']",
+        "p[data-placeholder]"
+      ],
+      "sendSelectors": [
+        "button[aria-label='Send message']",
+        "button[aria-label*='Send']",
+        "button[type='submit']"
+      ],
+      "stopSelectors": [
+        "button[aria-label='Stop response']",
+        "button[aria-label*='Stop']"
+      ],
+      "inputBackend": "dispatch"
+    },
+    {
+      "name": "gemini",
+      "hosts": ["gemini.google.com"],
+      "assistantSelector": "model-response, .model-response-text",
+      "composerSelectors": [
+        "div.ql-editor[contenteditable='true']",
+        "rich-textarea div[contenteditable='true']",
+        "div[contenteditable='true']"
+      ],
+      "sendSelectors": [
+        "button.send-button",
+        "button[aria-label*='Send']",
+        "button[mattooltip*='Send']"
+      ],
+      "stopSelectors": [
+        "button[aria-label*='Stop']",
+        "button.stop-icon"
+      ],
+      "inputBackend": "dispatch"
+    },
+    {
+      "name": "deepseek",
+      "hosts": ["chat.deepseek.com"],
+      "assistantSelector": "div[class*='assistant'], div.ds-markdown",
+      "composerSelectors": [
+        "textarea#chat-input",
+        "textarea[placeholder]",
+        "div[contenteditable='true']"
+      ],
+      "sendSelectors": [
+        "div[role='button'][aria-label*='Send']",
+        "button[type='submit']",
+        "div[class*='send']"
+      ],
+      "stopSelectors": [
+        "div[role='button'][aria-label*='Stop']",
+        "div[class*='stop']"
+      ],
+      "inputBackend": "dispatch"
+    },
+    {
+      "name": "qwen",
+      "hosts": ["chat.qwen.ai", "tongyi.aliyun.com"],
+      "assistantSelector": "div[class*='assistant'], div[class*='markdown']",
+      "composerSelectors": [
+        "textarea",
+        "div[contenteditable='true']"
+      ],
+      "sendSelectors": [
+        "button[aria-label*='Send']",
+        "button[type='submit']",
+        "div[class*='send-button']"
+      ],
+      "stopSelectors": [
+        "button[aria-label*='Stop']",
+        "div[class*='stop']"
+      ],
+      "inputBackend": "dispatch"
+    }
+  ]
+}
